@@ -12,6 +12,3 @@
   </svg>
 </template>
 
-<script>
-
-</script>

@@ -2,9 +2,13 @@
 import iconSun from './components/icons/iconSun.vue'
 import iconMoon from './components/icons/iconMoon.vue'
 import { useDarkMode } from './hooks/useDarkMode'
-import { ref } from '@vue/runtime-core';
+import { computed, reactive, ref, watch } from '@vue/runtime-core';
 import IconBomb from './components/icons/iconBomb.vue';
 import IconFlag from './components/icons/iconFlag.vue'
+import IconRefresh from './components/icons/iconRefresh.vue'
+import IconTime from './components/icons/iconTime.vue'
+import * as confetti from 'canvas-confetti'
+
 const mode = useDarkMode()
 interface block {
   x: number,
@@ -14,38 +18,101 @@ interface block {
   count?: number,
   isFlag: boolean
 }
-let arr: block[][] = new Array(3)
+let arr: block[][]
+const game = reactive({
+  length: 10,
+  count: 5,
+  flagCount: 0,
+  costTime: new Date().getSeconds(),
+  state: 'playing',
+})
+function create(length: number, count: number) {
+  game.flagCount = 0
+  game.state = 'playing'
+  arr = Array.from({ length: length }, (_, y) =>
+    Array.from({ length: length }, (_, x) =>
+    ({
+      x,
+      y,
+      isMine: false,
+      isOpen: false,
+      isFlag: false
+    }))
+  )
+  blocks.value = arr
+  generateBombs(blocks.value, count)
+}
+interface type {
+  title: string,
+  count: number,
+  length: number
+}
+const type: type[] = [{
+  title: 'Easy',
+  count: 10,
+  length: 9
+}, {
+  title: 'Medium',
+  count: 40,
+  length: 16,
+}, {
+  title: "Hard",
+  count: 88,
+  length: 16
+}]
 
-arr = Array.from({ length: 16 }, (_, y) =>
-  Array.from({ length: 16 }, (_, x) =>
-  ({
-    x,
-    y,
-    isMine: false,
-    isOpen: false,
-    isFlag: false
-  }))
-)
-
-const blocks = ref(arr)
+const blocks = ref<block[][]>([])
+let first = true, startTime
 const handleLeftClick = (block: block) => {
-
+  if (first) {
+    startTime = new Date().getTime()
+  }
+  if (game.state !== 'playing') return
+  if (block.isFlag === true) return
   if (block.isOpen === false) {
     block.isOpen = true
   }
-  if (block.count === 0)
+
+  if (block.count === 0) {
     clearAround(blocks.value, block)
+  }
   if (block.isMine === true) {
+    game.state = 'fail'
+    for (let i = 0; i < blocks.value.length; i++) {
+      for (let j = 0; j < blocks.value[0].length; j++) {
+        if (blocks.value[i][j].isMine === true) {
+          blocks.value[i][j].isOpen = true
+        }
+      }
+    }
     alert('boom')
   } else if (block.isMine === false) {
-
+    let count = 0
+    for (let i = 0; i < blocks.value.length; i++) {
+      for (let j = 0; j < blocks.value[0].length; j++) {
+        if (blocks.value[i][j].isOpen === false) count++
+      }
+    }
+    if (count === game.count) {
+      game.state = 'won'
+      confetti.default({
+        spread: 180,
+        particleCount: 150
+      })
+    }
   }
 }
 const handleRightClick = (e: MouseEvent, block: block) => {
   e.preventDefault()
+  if (game.state !== 'playing') return
+  if (block.isFlag) {
+    game.flagCount--
+  } else {
+    game.flagCount++
+  }
   block.isFlag = !block.isFlag
+
 }
-let status = ref('dev')
 
 const generateBombs = (blocks: block[][], count: number) => {
   while (count > 0) {
@@ -57,7 +124,7 @@ const generateBombs = (blocks: block[][], count: number) => {
     }
   }
 }
-generateBombs(blocks.value, 40)
+
 
 const getAroundBombNumber = (blocks: block[][], block: block) => {
   let startX = block.y - 1, startY = block.x - 1;
@@ -70,7 +137,7 @@ const getAroundBombNumber = (blocks: block[][], block: block) => {
     }
   }
   block.count = count
-  return count == 0 ? '' : count
+  return ''
 }
 const getColor = (num: number) => {
   let color = ''
@@ -79,18 +146,13 @@ const getColor = (num: number) => {
       break;
     case 2: color = 'text-red-400';
       break;
-      break;
     case 3: color = 'text-yellow-400';
-      break;
       break;
     case 4: color = 'text-green-400';
       break;
-      break;
     case 5: color = 'text-pink-400';
       break;
-      break;
     case 6: color = 'text-purple-400';
-      break;
       break;
     case 7: color = 'text-gray-400';
       break;
@@ -100,22 +162,6 @@ const getColor = (num: number) => {
 }
 const clearAround = (blocks: block[][], block: block) => {
   let startX = block.y - 1, startY = block.x - 1;
-  // const TRBL = [startX, startY - 1, startX + 1, startY, startX, startY + 1, startX - 1, startY,];
-
-
-  // if (block.count !== 0) return
-  // for (let i = 0; i < TRBL.length; i = i + 2) {
-  //   if (TRBL[i] >= 0 && TRBL[i + 1] >= 0 && TRBL[i] < blocks[0].length && TRBL[i + 1] < blocks.length) {
-  //     const current = blocks[TRBL[i]][TRBL[i + 1]]
-  //     if (current.isMine === true) return
-
-  //     if (current.count === 0 && current.isOpen === false) {
-  //       current.isOpen = true
-  //       clearAround(blocks, current)
-  //     }
-  //     current.isOpen = true
-  //   }
-  // }
   for (let i = startX; i <= startX + 2 && i < blocks.length; i++) {
     for (let j = startY; j <= startY + 2 && j < blocks[0].length; j++) {
       if (i >= 0 && j >= 0 && blocks[i][j] != block) {
@@ -133,35 +179,69 @@ const clearAround = (blocks: block[][], block: block) => {
   }
 }
 
+create(game.length, game.count)
+const handleChangeClick = (type: type) => {
+  game.count = type.count
+  game.length = type.length
+}
+const handleRefreshClick = () => {
+  create(game.length, game.count)
+}
+watch(() => game.count, () => {
+  create(game.length, game.count)
+})
 
+const costTime = computed(() => {
+  return new Date().getSeconds()
+})
 </script>
 
 <template>
-  <div class="h-screen text-center flex items-center flex-col p-4 dark:bg-gray-900 dark:text-white">
+  <div class="h-screen text-center flex items-center flex-col p-4">
     <div class="bg-blue flex items-center" @click="useDarkMode">
       <div class="p-2">Minesweeper</div>
       <icon-sun v-if="mode === 'auto'" />
       <icon-moon v-else />
     </div>
-    <div class="flex flex-col gap-0.5">
+    <div class="flex m-3 al">
+      <button
+        @click="handleRefreshClick"
+        class="py-1 px-2 mx-1 text-black bg-orange-500 rounded-lg"
+      >
+        <icon-refresh />
+      </button>
+      <button
+        @click="handleChangeClick(item)"
+        class="py-1 px-2 mx-1 text-black bg-orange-500 rounded-lg"
+        v-for="item in type"
+      >{{ item.title }}</button>
+    </div>
+    <div class="flex gap-10 text-lg font-mono">
+      <div class="flex items-center"></div>
+      <div class="flex items-center">
+        <icon-bomb />
+        :{{ game.count - game.flagCount }}
+      </div>
+    </div>
+    <div class="flex flex-col gap-0.5 pb-8">
       <template v-for="line in blocks">
         <div class="flex gap-0.5">
           <template v-for="block in line">
             <button
               @click="handleLeftClick(block)"
               @contextmenu="handleRightClick($event, block)"
-              class="w-8 h-8 lg:w-8 lg:h-8 border border-gray-400 flex items-center justify-center bg-slate-500 font-bold"
+              class="w-8 h-8 border border-gray-400 flex items-center justify-center bg-slate-500 font-bold"
               :class="[{ 'open': block.isOpen === true }, getColor(block.count ?? 0)]"
             >
-              {{ (block.isOpen || status === 'dev') ? (block.isMine ? "" : getAroundBombNumber(blocks, block)) : "" }}
-              <icon-bomb v-if="(block.isOpen || status === 'dev') && block.isMine" />
-              <icon-flag v-if="block.isFlag" />
+              {{ block.isMine ? '' : getAroundBombNumber(blocks, block) }}
+              {{ block.isOpen ? block.count == 0 ? '' : block.count : '' }}
+              <icon-bomb v-if="(block.isOpen) && block.isMine" />
+              <icon-flag v-else-if="block.isFlag && block.isOpen === false" />
             </button>
           </template>
         </div>
       </template>
     </div>
-    <button @click="status = status === 'dev' ? 'dep' : 'dev'">{{ status }}</button>
   </div>
 </template>
 
