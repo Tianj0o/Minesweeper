@@ -39,7 +39,6 @@ function create(length: number, count: number) {
     }))
   )
   blocks.value = arr
-
 }
 interface type {
   title: string,
@@ -207,6 +206,9 @@ watch(() => game.count, () => {
 })
 
 
+const costTime = computed(() => {
+  return new Date().getSeconds()
+})
 </script>
 
 <template>
