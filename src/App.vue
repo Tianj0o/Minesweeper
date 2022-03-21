@@ -1,11 +1,12 @@
-<script setup lang="ts">
+nextTick, <script setup lang="ts">
 import iconSun from './components/icons/iconSun.vue'
 import iconMoon from './components/icons/iconMoon.vue'
 import { useDarkMode } from './hooks/useDarkMode'
-import { computed, reactive, ref, watch } from '@vue/runtime-core';
+import { nextTick, reactive, ref, watch } from '@vue/runtime-core';
 import IconBomb from './components/icons/iconBomb.vue';
 import IconFlag from './components/icons/iconFlag.vue'
 import IconRefresh from './components/icons/iconRefresh.vue'
+import iconTime from './components/icons/iconTime.vue';
 import * as confetti from 'canvas-confetti'
 
 const mode = useDarkMode()
@@ -23,10 +24,11 @@ const game = reactive({
   length: 10,
   count: 10,
   flagCount: 0,
-  costTime: new Date().getSeconds(),
+  costTime: 0,
   state: <gameState>'pending',
 })
-function create(length: number, count: number) {
+function create(length: number) {
+  game.costTime = 0
   game.flagCount = 0
   arr = Array.from({ length: length }, (_, y) =>
     Array.from({ length: length }, (_, x) =>
@@ -85,7 +87,9 @@ const handleLeftClick = (block: block) => {
         }
       }
     }
-    alert('boom')
+    nextTick(() => {
+      alert('boom')
+    })
   } else if (block.isMine === false) {
     let count = 0
     for (let i = 0; i < blocks.value.length; i++) {
@@ -105,6 +109,7 @@ const handleLeftClick = (block: block) => {
 const handleRightClick = (e: MouseEvent, block: block) => {
   e.preventDefault()
   if (game.state !== 'playing') return
+  if (block.isOpen) return
   if (block.isFlag) {
     game.flagCount--
   } else {
@@ -191,24 +196,37 @@ const clearAround = (blocks: block[][], block: block) => {
   }
 }
 
-create(game.length, game.count)
+create(game.length)
 const handleChangeClick = (type: type) => {
   game.count = type.count
   game.length = type.length
 }
 const handleRefreshClick = () => {
   game.state = 'pending'
-  create(game.length, game.count)
+  create(game.length)
 }
 watch(() => game.count, () => {
   game.state = 'pending'
-  create(game.length, game.count)
+  create(game.length)
+})
+let start: number
+let timer: number
+
+watch(() => game.state, (state: gameState) => {
+  if (state === 'playing') {
+    game.costTime = 0
+    start = Date.now()
+    console.log(Date.now())
+    timer = setInterval(() => {
+      game.costTime++
+    }, 1000)
+  }
+  if (state === 'won' || state === 'fail' || state === 'pending') {
+    clearInterval(timer)
+  }
 })
 
 
-const costTime = computed(() => {
-  return new Date().getSeconds()
-})
 </script>
 
 <template>
@@ -232,10 +250,15 @@ const costTime = computed(() => {
       >{{ item.title }}</button>
     </div>
     <div class="flex gap-10 text-lg font-mono">
-      <div class="flex items-center"></div>
-      <div class="flex items-center">
-        <icon-bomb />
-        :{{ game.count - game.flagCount }}
+      <div class="flex gap-6 mb-1">
+        <div class="flex items-center">
+          <icon-time />
+          :{{ game.costTime }}
+        </div>
+        <div class="flex items-center">
+          <icon-bomb />
+          :{{ game.count - game.flagCount }}
+        </div>
       </div>
     </div>
     <div class="flex flex-col gap-0.5 pb-8">
